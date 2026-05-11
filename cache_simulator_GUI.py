@@ -315,7 +315,7 @@ from collections import deque
 
 resultados = []
 ultimo_padrao_acesso = None
-
+ultimo_bloco_tamanho = 1
 
 def rodar_simulacao_callback():
     start_time = time.time()
@@ -390,6 +390,8 @@ def rodar_simulacao_callback():
                 (prob_temporal, prob_espacial, prob_quente),
                 bt
             )
+            global ultimo_bloco_tamanho
+            ultimo_bloco_tamanho = bt  # Salva o último tamanho de bloco processado
             dpg.set_value("barra", progresso)
             dpg.set_value("texto", f"{int(progresso * 100)}% concluído")
             resultados.append((bt, taxas_acerto))
@@ -448,7 +450,7 @@ def mostrar_heatmap_callback(sender, app_data):
         # 2. Configura os dados para o gráfico
         resolucao_temporal = 100
         x = [i // resolucao_temporal for i in range(len(ultimo_padrao_acesso))]
-        y = ultimo_padrao_acesso
+        y = [addr // ultimo_bloco_tamanho for addr in ultimo_padrao_acesso]
 
         # Usando hist2d, agrupamos os dados e resolvemos o problema do gráfico "preto" invisível
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -462,9 +464,9 @@ def mostrar_heatmap_callback(sender, app_data):
         if h[3] is not None:
             fig.colorbar(h[3], ax=ax, label="Número de Acessos")
 
-        ax.set_title("Evolução dos Acessos à Memória (Última Simulação)")
+        ax.set_title(f"Acessos por Bloco (Tamanho: {ultimo_bloco_tamanho})")
         ax.set_xlabel(f"Grupos de {resolucao_temporal} Acessos")
-        ax.set_ylabel("Endereço de Memória")
+        ax.set_ylabel("Índice do Bloco de Memória")
 
         # 3. Salvar figura direto na memória (Buffer) em vez de criar arquivo PNG
         buf = io.BytesIO()
