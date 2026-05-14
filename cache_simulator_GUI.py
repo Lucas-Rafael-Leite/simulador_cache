@@ -509,6 +509,68 @@ def mostrar_heatmap_callback(sender, app_data):
         dpg.set_value("mensagem_erro", f"Erro ao gerar Heatmap: {str(e)}")
 
 
+def mostrar_especificacoes_callback():
+    try:
+        # Coleta de dados da interface
+        M = dpg.get_value("memory_size")  # Tamanho da Memória (Bytes)
+        C = dpg.get_value("tamanho_cache")  # Tamanho da Cache (Bytes)
+        A = dpg.get_value("associatividade")  # Associatividade
+
+        # Como o campo 'blocos' é uma lista, será utilizado o primeiro valor para o cálculo de hardware
+        blocos_input = dpg.get_value("blocos")
+        B = int(blocos_input.split(",")[0].strip())
+
+        # 1. Cálculos de Endereçamento
+        # Endereço total em bits = log2(M)
+        bits_endereco = int(math.log2(M))
+
+        # Bits de Offset (palavra) = log2(B)
+        bits_offset = int(math.log2(B))
+
+        # Número de Linhas (Slots) = C / B
+        num_linhas = C // B
+
+        # Número de Conjuntos (Sets) = Linhas / Associatividade
+        num_conjuntos = num_linhas // A
+
+        # Bits de Índice (conjunto/linha) = log2(Conjuntos)
+        bits_indice = int(math.log2(num_conjuntos))
+
+        # Bits de Tag (rótulo) = Total - Índice - Offset
+        bits_tag = bits_endereco - bits_indice - bits_offset
+
+        # 2. Tamanho Físico (Hardware)
+        # Cálculo das linhas de comparação em hardware (equivalente ao número de bits enviado ao comparador)
+        linhas_hardware = bits_tag + (bits_tag * A)
+
+
+
+        # Gerar Texto de Saída
+        specs_texto = (
+            f"--- CONFIGURAÇÃO DE HARDWARE ---\n"
+            f"Endereçamento: {bits_endereco} bits\n"
+            f"Linhas de Cache: {num_linhas}\n"
+            f"Estrutura: {num_conjuntos} conjuntos de {A} linhas\n\n"
+            f"--- DIVISÃO DO ENDEREÇO ---\n"
+            f"Tag: {bits_tag} bits\n"
+            f"Índice: {bits_indice} bits\n"
+            f"Offset: {bits_offset} bits\n\n"
+            f"--- IMPLEMENTAÇÃO FÍSICA ---\n"
+            f"Linhas de Hardware: {linhas_hardware} linhas de comparação\n\n"
+        )
+
+        # Criar ou atualizar janela de especificações
+        if dpg.does_alias_exist("janela_specs"):
+            dpg.delete_item("janela_specs")
+
+        with dpg.window(label="Especificações de Engenharia", tag="janela_specs", width=400, height=450,
+                        pos=[500, 100]):
+            dpg.add_text(specs_texto)
+            dpg.add_button(label="Fechar", callback=lambda: dpg.delete_item("janela_specs"))
+
+    except Exception as e:
+        dpg.set_value("mensagem_erro", f"Erro no cálculo: {str(e)}")
+
 # Limpa plots e elementos graficos (barra e caixas de texto)
 def limpar_plots():
     global plot_series_tags
@@ -523,7 +585,7 @@ def limpar_plots():
 
 def limpar_ultimo_plot():
     global plot_series_tags
-    # Limpa dados da simulação na Caixa de tetxto Resumo
+    # Limpa dados da simulação na Caixa de texto Resumo
     # dpg.set_value("Resumo", "\n")
     dpg.set_value("mensagem_erro", " ")
     dpg.set_value("barra", 0.0)
@@ -597,6 +659,7 @@ with dpg.window(label="Simulação de Cache", width=1400, height=900):
 
     with dpg.group(horizontal=True):  # Inicia um grupo horizontal
         dpg.add_button(label="Simular", callback=rodar_simulacao_callback)
+        dpg.add_button(label="Mostrar Especificações", callback=mostrar_especificacoes_callback)
         dpg.add_button(label="Limpar Último", callback=limpar_ultimo_plot)
         dpg.add_button(label="Limpar Plots", callback=limpar_plots)
         dpg.add_progress_bar(tag="barra", default_value=0.0, width=300)
