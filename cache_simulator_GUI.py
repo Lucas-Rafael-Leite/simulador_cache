@@ -192,6 +192,83 @@ def simular_cache_RANDOM(padrao_acesso, cache_lines, associatividade, bloco_tama
 
     return conjunto_log, hit_log
 
+# Simulação de cache com política de substituição Pseudo-LRU (PLRU)
+def simular_cache_PLRU(padrao, cache_lines, associatividade, bloco_tamanho):
+
+    num_conjuntos = cache_lines // associatividade
+    
+    # Cada conjunto tem: lista de blocos e árvore PLRU
+    cache = [[] for _ in range(num_conjuntos)]  # blocos em cada conjunto
+    plru_bits = []  # árvore PLRU para cada conjunto
+    
+    # Inicializa árvores PLRU
+    num_bits_por_conjunto = associatividade - 1
+    for _ in range(num_conjuntos):
+        plru_bits.append([0] * num_bits_por_conjunto)
+    
+    hits, misses = 0, 0
+    conjunto_log, hit_log = [], []
+    
+    def get_plru_victim(bits, associatividade):
+        index = 0
+        offset = 1
+        
+        while offset < associatividade:
+            if bits[index] == 0:
+                index = index * 2 + 1  # vai para esquerda
+            else:
+                index = index * 2 + 2  # vai para direita
+            offset *= 2
+        
+        # Retorna o índice na folha
+        return index - (associatividade - 1)
+    
+    def update_plru_bits(bits, usado_idx, associatividade):
+        # Encontra o caminho na árvore
+        path = []
+        idx = usado_idx + (associatividade - 1)  # índice na árvore
+        while idx > 0:
+            parent = (idx - 1) // 2
+            path.append(parent)
+            idx = parent
+        
+        # Inverte os bits no caminho
+        for node in path:
+            bits[node] ^= 1
+    
+    for endereco in padrao:
+        bloco = endereco // bloco_tamanho
+        conjunto = bloco % num_conjuntos
+        
+        cache_atual = cache[conjunto]
+        bits_atual = plru_bits[conjunto]
+        
+        # Verifica se o bloco está na cache
+        if bloco in cache_atual:
+            hits += 1
+            hit_log.append(1)
+            # Atualiza bits PLRU
+            idx = cache_atual.index(bloco)
+            update_plru_bits(bits_atual, idx, associatividade)
+        else:
+            misses += 1
+            hit_log.append(0)
+            
+            # Se cache está cheio, encontra vítima
+            if len(cache_atual) >= associatividade:
+                # Encontra vítima usando PLRU
+                vítima_idx = get_plru_victim(bits_atual, associatividade)
+                cache_atual[vítima_idx] = bloco
+                # Atualiza bits para o novo bloco
+                update_plru_bits(bits_atual, vítima_idx, associatividade)
+            else:
+                # Adiciona novo bloco
+                cache_atual.append(bloco)
+                # Atualiza bits para o novo bloco
+                update_plru_bits(bits_atual, len(cache_atual) - 1, associatividade)
+        
+        conjunto_log.append(conjunto)
+    return conjunto_log, hit_log
 
 # ------------------------------------------------------------------------------
 # Variável global que armazena o algoritmo de substituição selecionado
@@ -248,6 +325,8 @@ def simulacao_monte_carlo(n_simulacoes, acessos, memory_size, cache_lines, assoc
             conjunto_log, hit_log = simular_cache_LFU(padrao, cache_lines, associatividade, bloco_tamanho)
         elif algoritmo_escolhido == 'Random':
             conjunto_log, hit_log = simular_cache_RANDOM(padrao, cache_lines, associatividade, bloco_tamanho)
+        elif algoritmo_escolhido == 'PLRU':
+            conjunto_log, hit_log = simular_cache_PLRU(padrao, cache_lines, associatividade, bloco_tamanho)            
         else:
             raise ValueError(f"Algoritmo de substituição desconhecido: {algoritmo_escolhido}")
 
@@ -666,7 +745,7 @@ with dpg.window(label="Simulação de Cache", width=1400, height=900):
         dpg.add_text("0% concluído", tag="texto")
         # Combobox escolha do algoritmo de substituição
         # dpg.add_text("Algoritmo de Substituição:")
-        dpg.add_combo(items=["FIFO", "LRU", "LFU", "Random"], default_value='FIFO',
+        dpg.add_combo(items=["FIFO", "LRU", "LFU","PLRU" ,"Random"], default_value='FIFO',
                       label="<-- Algoritmo de Substituição", width=100, tag="combo_algoritmo",
                       callback=selecionar_algoritmo)
         # Salvar Grafico está com erro!!!
